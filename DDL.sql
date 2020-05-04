@@ -78,7 +78,7 @@ ON (patents.publication_nr = t2.publication_nr);
  drop table if exists standards;
  CREATE TABLE standards (
     title VARCHAR(1000) NOT NULL,
-    std_doc_id VARCHAR(40) NOT NULL,
+    std_doc_id VARCHAR(100) NOT NULL,
     tech_gen VARCHAR(40),
     publication_date DATE NOT NULL,
     sso VARCHAR(40) NOT NULL,
@@ -91,7 +91,7 @@ ON (patents.publication_nr = t2.publication_nr);
 
 drop table if exists standard_authors;
 CREATE TABLE standard_authors (
-    std_doc_id VARCHAR(40) NOT NULL,
+    std_doc_id VARCHAR(100) NOT NULL,
     author VARCHAR(100) NOT NULL,
     FOREIGN KEY (std_doc_id)
         REFERENCES standards (std_doc_id)
@@ -108,12 +108,6 @@ insert into standards values
 "3GPP 3GPP-Release-15 3GPP-SA","15.0.0", 
 "https://www.etsi.org/deliver/etsi_ts/123200_123299/123272/15.00.00_60/ts_123272v150000p.pdf");
 
-insert into standard_authors values
-("TS 23.401 v8.18.0", "Pope", "Maurice"),
-("TS 23.401 v8.18.0", "Pudney", "Chris"),
-("TS 23.272 v15.0.0","Pope", "Maurice"),
-("TS 23.272 v15.0.0", "Demel", "Sabine");
-
 # test join
 SELECT GROUP_CONCAT(author SEPARATOR ' | ') AS authors, t1.*
 FROM
@@ -128,11 +122,11 @@ GROUP BY std_doc_id;
 ####### Declarations: ###############
 drop table if exists declarations;
 CREATE TABLE declarations (
-    declaring_company VARCHAR(40) NOT NULL,
+    declaring_company VARCHAR(100) NOT NULL,
     declaration_date DATE NOT NULL,
-    std_proj VARCHAR(40) NOT NULL,
-    std_doc_id VARCHAR(40) NOT NULL,
-    tech_gen VARCHAR(40) NOT NULL,
+    std_proj VARCHAR(100) NOT NULL,
+    std_doc_id VARCHAR(100) NOT NULL,
+    tech_gen VARCHAR(100) NOT NULL,
     releases VARCHAR(1000) NOT NULL,
     publication_nr VARCHAR(40) NOT NULL,
     application_nr VARCHAR(40) NOT NULL,

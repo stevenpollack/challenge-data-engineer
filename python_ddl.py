@@ -3,7 +3,7 @@ from mysql.connector import errorcode
 import datetime, re, csv
 
 # delete db before closing connection?
-cleanup = True 
+cleanup = False 
 # delete and remake tables?
 clean_start = True
 
@@ -72,18 +72,18 @@ TABLES['prior_art'] = ("""CREATE TABLE prior_art (
 
 TABLES['standards'] = """CREATE TABLE standards (
     title VARCHAR(1000) NOT NULL,
-    std_doc_id VARCHAR(40) NOT NULL,
-    tech_gen VARCHAR(40),
+    std_doc_id VARCHAR(100) NOT NULL,
+    tech_gen VARCHAR(100),
     publication_date DATE NOT NULL,
-    sso VARCHAR(40) NOT NULL,
-    std_proj VARCHAR(40) NOT NULL,
+    sso VARCHAR(100) NOT NULL,
+    std_proj VARCHAR(100) NOT NULL,
     version_hist VARCHAR(40) NOT NULL,
     original_doc VARCHAR(256) NOT NULL,
     PRIMARY KEY (std_doc_id),
     INDEX (std_proj)) ENGINE=INNODB;"""
 
 TABLES['standard_authors'] = """CREATE TABLE standard_authors (
-    std_doc_id VARCHAR(40) NOT NULL,
+    std_doc_id VARCHAR(100) NOT NULL,
     author VARCHAR(100) NOT NULL,
     FOREIGN KEY (std_doc_id)
         REFERENCES standards (std_doc_id)
@@ -91,11 +91,11 @@ TABLES['standard_authors'] = """CREATE TABLE standard_authors (
   ENGINE=INNODB;"""
 
 TABLES['declarations'] = """CREATE TABLE declarations (
-    declaring_company VARCHAR(40) NOT NULL,
+    declaring_company VARCHAR(100) NOT NULL,
     declaration_date DATE NOT NULL,
-    std_proj VARCHAR(40) NOT NULL,
-    std_doc_id VARCHAR(40) NOT NULL,
-    tech_gen VARCHAR(40) NOT NULL,
+    std_proj VARCHAR(100) NOT NULL,
+    std_doc_id VARCHAR(100) NOT NULL,
+    tech_gen VARCHAR(100) NOT NULL,
     releases VARCHAR(1000) NOT NULL,
     publication_nr VARCHAR(40) NOT NULL,
     application_nr VARCHAR(40) NOT NULL,
@@ -132,8 +132,6 @@ for table_name in TABLES:
         print("OK")
 
 
-
-# need a citation table -- can figure out most cited patents and their descendent's MC & TR
 def deaggregateField(row, field_name, key_name, sep="|"):
   values = [value.strip() for value in row[field_name].split(sep)]
   return [(row[key_name], values) for values in values]
@@ -153,16 +151,17 @@ def formatPatentData(row):
   
   return row
 
-# there's a primary key issue with `declarations`. Fix this and
-# implement standards processor.
-
 def insertDeclarationRowData(cursor, row):
-  cursor.execute("""
-  INSERT INTO declarations VALUE (
-    %(declaring_company)s, %(declaration_date)s, %(standard_project)s,
-    %(standard_document_id)s, %(technology_generation)s, %(releases)s,
-    %(publication_nr)s, %(application_nr)s)
-   """, row)
+  try:
+    cursor.execute("""
+    INSERT INTO declarations VALUE (
+      %(declaring_company)s, %(declaration_date)s, %(standard_project)s,
+      %(standard_document_id)s, %(technology_generation)s, %(releases)s,
+      %(publication_nr)s, %(application_nr)s)
+    """, row)
+  except mysql.IntegrityError as err:
+    print("Integrity Error! Not adding data to `declarations`...")
+    print("Error message: {}".format(err))
 
   return row
 
@@ -206,6 +205,23 @@ def processDeclarationsData(cursor, row):
   return row
 
 def processStandardsData(cursor, row):
+  # split up authors
+  authors = deaggregateField(row, 'author', 'standard_document_id')
+  row.pop('author')
+
+  cursor.executemany("""
+  INSERT INTO standard_authors VALUE (%s, UPPER(%s))""", authors)
+    
+  pub_date = datetime.date.fromisoformat(row['publication_date'])
+  row['publication_date'] = pub_date
+  cursor.execute("""
+  INSERT INTO standards VALUE (
+    %(title)s, %(standard_document_id)s, %(technology_generation)s,
+    %(publication_date)s, %(standard_setting_organization)s,
+    %(standard_project)s, %(version_history)s, %(original_document)s
+  )
+  """, row)
+
   return row
 
 dataProcessors = {
@@ -214,11 +230,13 @@ dataProcessors = {
   'standards': processStandardsData
 }
 
-def ingestDump (filepath='./dumps/patents.csv', processors=dataProcessors):
+def ingestDump (filepath, processors=dataProcessors):
 
   # extract file name without .csv and use that to find proper data processor
   dataType = re.findall(r'(\w*)\.csv$', filepath)[0]
   dataProcessor = processors[dataType]
+
+  print("Processing {}...".format(filepath))
 
   with open(filepath, encoding='utf-8', newline='') as csvfile:
     reader = csv.DictReader(csvfile, delimiter=",", quotechar='"')
@@ -233,7 +251,7 @@ def ingestDump (filepath='./dumps/patents.csv', processors=dataProcessors):
       rows_processed += 1
 
     csvfile.close()
-
+  print("Done with {}... {} rows processed.".format(filepath, rows_processed))
   return True
 
 dumps = ['./dumps/patents.csv',
@@ -243,10 +261,13 @@ dumps = ['./dumps/patents.csv',
 for filepath in dumps:
   ingestDump(filepath)
 
+print("Re-enabling foreign key checks in DB for data integrity...")
+cursor.execute("SET foreign_key_checks = 1;")
+
 if cleanup:
+  print("Cleaning up database...")
   cursor.execute("DROP DATABASE IF EXISTS {};".format(DB_NAME))
 
-# re-enable FOREIGN KEY CHECKS
-cursor.execute("SET foreign_key_checks = 1;")
+print("Closing connection...")
 cursor.close()
 db.close()
