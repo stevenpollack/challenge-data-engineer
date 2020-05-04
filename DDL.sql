@@ -15,7 +15,6 @@ CREATE TABLE patents (
     kind_type VARCHAR(20),
     granted BOOLEAN,
     lapsed BOOLEAN,
-    patent_citation VARCHAR(20),
     family_size INT,
     market_coverage FLOAT,
     technical_relevance FLOAT,
@@ -24,16 +23,24 @@ CREATE TABLE patents (
 )  ENGINE=INNODB;
 
 #create index applicant on patents (applicant);
+CREATE TABLE prior_art (
+  patent_nr VARCHAR(40) NOT NULL,
+  cited_patent_nr VARCHAR(40) NOT NULL,
+  INDEX (patent_nr),
+  FOREIGN KEY (cited_patent_nr)
+    REFERENCES patents (publication_nr)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=INNODB;
 
 drop table if exists patent_inventors;
 CREATE TABLE patent_inventors (
     publication_nr VARCHAR(40) NOT NULL,
-    last_name VARCHAR(20) NOT NULL,
-    first_name VARCHAR(20) NOT NULL,
+    inventor VARCHAR(100) NOT NULL,
     FOREIGN KEY (publication_nr)
         REFERENCES patents (publication_nr)
         ON DELETE CASCADE ON UPDATE CASCADE
 )  ENGINE=INNODB;
+
 
 insert into patents
 values ("SIGNAL INDICATION FOR FLEXIBLE NEW RADIO (NR) LONG TERM EVOLUTION (LTE) COEXISTENCE | INDICATION DE SIGNAL POUR COEXISTENCE SOUPLE NOUVELLE RADIO (NR) / ÉVOLUTION À LONG TERME (LTE)",
@@ -85,8 +92,7 @@ ON (patents.publication_nr = t2.publication_nr);
 drop table if exists standard_authors;
 CREATE TABLE standard_authors (
     std_doc_id VARCHAR(40) NOT NULL,
-    last_name VARCHAR(40) NOT NULL,
-    first_name VARCHAR(40) NOT NULL,
+    author VARCHAR(100) NOT NULL,
     FOREIGN KEY (std_doc_id)
         REFERENCES standards (std_doc_id)
         ON UPDATE CASCADE ON DELETE CASCADE
@@ -127,10 +133,10 @@ CREATE TABLE declarations (
     std_proj VARCHAR(40) NOT NULL,
     std_doc_id VARCHAR(40) NOT NULL,
     tech_gen VARCHAR(40) NOT NULL,
-    released VARCHAR(1000) NOT NULL,
+    releases VARCHAR(1000) NOT NULL,
     publication_nr VARCHAR(40) NOT NULL,
     application_nr VARCHAR(40) NOT NULL,
-    PRIMARY KEY (declaration_date),
+    PRIMARY KEY (declaration_date, std_doc_id, std_proj, publication_nr),
     CONSTRAINT FK_STD_DOC_ID FOREIGN KEY (std_doc_id)
         REFERENCES standards (std_doc_id)
         ON UPDATE CASCADE ON DELETE CASCADE,
@@ -148,7 +154,7 @@ CREATE TABLE declarations (
 
 # turn off foreign key checks for the purpose of DDL
 set foreign_key_checks = 0;
-
+set autocommit = 1;
 
 insert into declarations values
 ("Apple Inc.",DATE("2017-11-03"),"3GPP","TS 36.300 v8.12.0","4G","Release 8 | Release 13 | Release 12 | Release 9 | Release 11 | Release 10 | Release 16 | Release 15 | Release 14","US8199719B2","US2009400834A"),
