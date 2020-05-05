@@ -1,5 +1,5 @@
 drop database if exists iplytics;
-create database iplytics;
+create database iplytics character set uft8mb4;
 use iplytics;
 
 ######### Patents & Patent Authors: ##############
@@ -19,8 +19,8 @@ CREATE TABLE patents (
     market_coverage FLOAT,
     technical_relevance FLOAT,
     PRIMARY KEY (publication_nr),
-    INDEX (applicant)
-)  ENGINE=INNODB;
+    INDEX (applicant))
+    ENGINE=INNODB;
 
 #create index applicant on patents (applicant);
 CREATE TABLE prior_art (
