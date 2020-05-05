@@ -34,15 +34,33 @@ conda install -c anaconda mysql-connector-python
 ```
 or `pip` should fetch it without too many issues.
 
-`Standard` entities are authored by individuals and can be identified by their `standard_doc_id`
+The loading `.py` is named `python_ddl.py` and needs to sit in the same directory as
+`dumps/`. Moreover, it is hardcoded to anticipate the existence of
 
-technical limitations:
+* `dumps/patents.csv`
+* `dumps/standards.csv`
+* `dumps/declarations.csv`
 
-1. there were/are duplicate records in the `declarations.csv` data dump. I could've cleaned them in data pre-processing, but I decided to `INSERT` the data into a `try...except...` block and look for the `IntegrityError` exception to skip the insertion. This is predicated upon the idea that my `declarations` table has defined its primary key via
+and their original column names. This is because the database schema was inferred to have
+the following entity-relationship diagram:
+
+![](mwb-reverse-engineer.png)
+
+Some basic data exploration indicated that the `declarations.csv` data had a (minimal) primary key consisting of columns
+```
+standard_document_id standard_project publication_nr declaration_date
+```
+
+However, and more importantly: there were/are duplicate records in the `declarations.csv` data dump. I could've cleaned them in data pre-processing, but I decided to `INSERT` the data into a `try...except...` block and look for the `IntegrityError` exception to skip the insertion. This is predicated upon the idea that my `declarations` table has defined its primary key via
 ```
 PRIMARY KEY (declaration date, std_doc_id, std_proj, publication_nr)
 ```
-From my data exploration, this is a minimal identifying set of keys, so I was a bit stumped to notice that the dump has duplicates.
+That there are duplicates in this extract is kind of confusing: surely the database that they came from would maintain its own integrity and make this impermissible?...
+
+A final note: this data includes Asian characters (Japanese?) and MySQL doesn't have true UTF-8 character support, so the database needs to be initialized with the `utf8mb4` character set:
+```
+CREATE DATABASE IF NOT EXISTS IPlytics CHARACTER SET utf8mb4;
+```
 
 # analysis
 
