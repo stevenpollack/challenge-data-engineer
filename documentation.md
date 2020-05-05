@@ -183,3 +183,10 @@ KR2014009289A | 1 | 0 | 1.704514980316162 | 1 | 8 | 1 | 0
 It seems as if, for this small sample, none of the descendant patents lapsed, and only 25%
 failed to get granted. Moreover, the most cited patent, `WO2014067166A1`, was used by
 3 different applicants and had the second highest average TR.
+
+## Future analysis
+There are other patent questions probably worthy of analysis. For instance:
+
+* what's the probability a patent gets granted when it doesn't cite prior work? Do more citations affect this probability?
+* What's the relationship between associated standard and TR/MC?
+* What's the managerial relevance of the metrics TR and MC? (Meaning: how do I, an external company, make money from a good understanding of them?)
