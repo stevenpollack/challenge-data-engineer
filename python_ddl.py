@@ -1,16 +1,19 @@
 import mysql.connector as mysql
 from mysql.connector import errorcode
-import datetime, re, csv
+import datetime
+import re
+import csv
 
 # delete db before closing connection?
-cleanup = False 
+cleanup = False
 # delete and remake tables?
 clean_start = True
 
 db = mysql.connect(
-  host = "localhost",
-  user = "root",
-  passwd = "password"
+    host="localhost",
+    user="root",
+    passwd="password",
+    port=123
 )
 
 cursor = db.cursor()
@@ -22,17 +25,18 @@ cursor.execute("SET autocommit = 1;")
 # connect to DB -- create if it doesn't exist
 DB_NAME = "IPlytics"
 try:
-  cursor.execute("USE {}".format(DB_NAME))
+    cursor.execute("USE {}".format(DB_NAME))
 except mysql.ProgrammingError as err:
-  if err.errno == 1049:
-    print("{} database doesn't exist... Making it now.".format(DB_NAME))
-    cursor.execute("CREATE DATABASE {};".format(DB_NAME))
-    cursor.execute("USE {};".format(DB_NAME))
-    warnings = cursor.fetchwarnings()
-    if warnings:
-      print(warnings)
-    else:
-      print("{} successfully created and set.".format(DB_NAME))
+    if err.errno == 1049:
+        print("{} database doesn't exist... Making it now.".format(DB_NAME))
+        cursor.execute(
+            "CREATE DATABASE {} CHARACTER SET utf8mb4;".format(DB_NAME))
+        cursor.execute("USE {};".format(DB_NAME))
+        warnings = cursor.fetchwarnings()
+        if warnings:
+            print(warnings)
+        else:
+            print("{} successfully created and set.".format(DB_NAME))
 
 # create our tables:
 TABLES = {}
@@ -123,9 +127,9 @@ for table_name in TABLES:
         if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
             print("{} already exists!...".format(table_name))
             if clean_start:
-              print("Dropping and remaking...")
-              cursor.execute("DROP TABLE {};".format(table_name))
-              cursor.execute(table_description)
+                print("Dropping and remaking...")
+                cursor.execute("DROP TABLE {};".format(table_name))
+                cursor.execute(table_description)
         else:
             print(err.msg)
     else:
@@ -133,44 +137,47 @@ for table_name in TABLES:
 
 
 def deaggregateField(row, field_name, key_name, sep="|"):
-  values = [value.strip() for value in row[field_name].split(sep)]
-  return [(row[key_name], values) for values in values]
+    values = [value.strip() for value in row[field_name].split(sep)]
+    return [(row[key_name], values) for values in values]
+
 
 def formatPatentData(row):
-  row['title'] = "{:.400}".format(row['title'])
-  pub_date = row['publication_date']
-  row['publication_date'] = datetime.date.fromisoformat(pub_date)
-  # if legal status starts with t it's True
-  row['lapsed'] = row['lapsed'].startswith('t')
-  row['granted'] = row['granted'].startswith('t')
+    row['title'] = "{:.400}".format(row['title'])
+    pub_date = row['publication_date']
+    row['publication_date'] = datetime.date.fromisoformat(pub_date)
+    # if legal status starts with t it's True
+    row['lapsed'] = row['lapsed'].startswith('t')
+    row['granted'] = row['granted'].startswith('t')
 
-  # deaggregate citations and authors
-  row['inventor'] = deaggregateField(row, 'inventor', 'publication_nr')
-  row['patent_citation'] = \
-    deaggregateField(row, 'patent_citation', 'publication_nr')
-  
-  return row
+    # deaggregate citations and authors
+    row['inventor'] = deaggregateField(row, 'inventor', 'publication_nr')
+    row['patent_citation'] = \
+        deaggregateField(row, 'patent_citation', 'publication_nr')
+
+    return row
+
 
 def insertDeclarationRowData(cursor, row):
-  try:
-    cursor.execute("""
+    try:
+        cursor.execute("""
     INSERT INTO declarations VALUE (
       %(declaring_company)s, %(declaration_date)s, %(standard_project)s,
       %(standard_document_id)s, %(technology_generation)s, %(releases)s,
       %(publication_nr)s, %(application_nr)s)
     """, row)
-  except mysql.IntegrityError as err:
-    print("Integrity Error! Not adding data to `declarations`...")
-    print("Error message: {}".format(err))
+    except mysql.IntegrityError as err:
+        print("Integrity Error! Not adding data to `declarations`...")
+        print("Error message: {}".format(err))
 
-  return row
+    return row
+
 
 def insertPatentRowData(cursor, row):
-  
-  inventors = row.pop('inventor')
-  citations = row.pop('patent_citation')
 
-  cursor.execute("""
+    inventors = row.pop('inventor')
+    citations = row.pop('patent_citation')
+
+    cursor.execute("""
   INSERT INTO patents VALUE (
     %(title)s, %(publication_nr)s, %(inpadoc_family_id)s,
      %(applicant)s, %(patent_office)s, %(publication_date)s,
@@ -179,42 +186,45 @@ def insertPatentRowData(cursor, row):
   );
   """, row)
 
-  cursor.executemany("""
+    cursor.executemany("""
   INSERT INTO prior_art (patent_nr, cited_patent_nr) 
     VALUES (%s, %s)  
   """, citations)
 
-  cursor.executemany("""
+    cursor.executemany("""
   INSERT INTO patent_inventors (publication_nr, inventor)
     VALUES (%s, UPPER(%s))
   """, inventors)
 
-  row['inventors'] = inventors
-  row['citations'] = citations
-  return row
+    row['inventors'] = inventors
+    row['citations'] = citations
+    return row
+
 
 def processPatentData(cursor, row):
-  data = formatPatentData(row)
-  data = insertPatentRowData(cursor, data)
-  return data
+    data = formatPatentData(row)
+    data = insertPatentRowData(cursor, data)
+    return data
+
 
 def processDeclarationsData(cursor, row):
-  dec_date = row['declaration_date']
-  row['declaration_date'] = datetime.date.fromisoformat(dec_date)
-  row = insertDeclarationRowData(cursor, row)
-  return row
+    dec_date = row['declaration_date']
+    row['declaration_date'] = datetime.date.fromisoformat(dec_date)
+    row = insertDeclarationRowData(cursor, row)
+    return row
+
 
 def processStandardsData(cursor, row):
-  # split up authors
-  authors = deaggregateField(row, 'author', 'standard_document_id')
-  row.pop('author')
+    # split up authors
+    authors = deaggregateField(row, 'author', 'standard_document_id')
+    row.pop('author')
 
-  cursor.executemany("""
+    cursor.executemany("""
   INSERT INTO standard_authors VALUE (%s, UPPER(%s))""", authors)
-    
-  pub_date = datetime.date.fromisoformat(row['publication_date'])
-  row['publication_date'] = pub_date
-  cursor.execute("""
+
+    pub_date = datetime.date.fromisoformat(row['publication_date'])
+    row['publication_date'] = pub_date
+    cursor.execute("""
   INSERT INTO standards VALUE (
     %(title)s, %(standard_document_id)s, %(technology_generation)s,
     %(publication_date)s, %(standard_setting_organization)s,
@@ -222,51 +232,54 @@ def processStandardsData(cursor, row):
   )
   """, row)
 
-  return row
+    return row
+
 
 dataProcessors = {
-  'patents': processPatentData,
-  'declarations': processDeclarationsData,
-  'standards': processStandardsData
+    'patents': processPatentData,
+    'declarations': processDeclarationsData,
+    'standards': processStandardsData
 }
 
-def ingestDump (filepath, processors=dataProcessors):
 
-  # extract file name without .csv and use that to find proper data processor
-  dataType = re.findall(r'(\w*)\.csv$', filepath)[0]
-  dataProcessor = processors[dataType]
+def ingestDump(filepath, processors=dataProcessors):
 
-  print("Processing {}...".format(filepath))
+    # extract file name without .csv and use that to find proper data processor
+    dataType = re.findall(r'(\w*)\.csv$', filepath)[0]
+    dataProcessor = processors[dataType]
 
-  with open(filepath, encoding='utf-8', newline='') as csvfile:
-    reader = csv.DictReader(csvfile, delimiter=",", quotechar='"')
+    print("Processing {}...".format(filepath))
 
-    # remove \s, ., and ()'s from field_names
-    reader.fieldnames = [ \
-      re.sub(r'[.()]', '', name.replace(' ', '_')).lower() for name in reader.fieldnames]
+    with open(filepath, encoding='utf-8', newline='') as csvfile:
+        reader = csv.DictReader(csvfile, delimiter=",", quotechar='"')
 
-    rows_processed = 0
-    for row in reader:
-      data = dataProcessor(cursor, row)
-      rows_processed += 1
+        # remove \s, ., and ()'s from field_names
+        reader.fieldnames = [
+            re.sub(r'[.()]', '', name.replace(' ', '_')).lower() for name in reader.fieldnames]
 
-    csvfile.close()
-  print("Done with {}... {} rows processed.".format(filepath, rows_processed))
-  return True
+        rows_processed = 0
+        for row in reader:
+            data = dataProcessor(cursor, row)
+            rows_processed += 1
+
+        csvfile.close()
+    print("Done with {}... {} rows processed.".format(filepath, rows_processed))
+    return True
+
 
 dumps = ['./dumps/patents.csv',
          './dumps/standards.csv',
          './dumps/declarations.csv']
 
 for filepath in dumps:
-  ingestDump(filepath)
+    ingestDump(filepath)
 
 print("Re-enabling foreign key checks in DB for data integrity...")
 cursor.execute("SET foreign_key_checks = 1;")
 
 if cleanup:
-  print("Cleaning up database...")
-  cursor.execute("DROP DATABASE IF EXISTS {};".format(DB_NAME))
+    print("Cleaning up database...")
+    cursor.execute("DROP DATABASE IF EXISTS {};".format(DB_NAME))
 
 print("Closing connection...")
 cursor.close()
