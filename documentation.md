@@ -1,4 +1,6 @@
-# using docker's mysql image
+# Some Technical Notes:
+
+## using docker's mysql image
 For security purposes, you cannot connect to the mysql server from outside the container, so you need to grep the container logs for the generated password, then enter the container and change some security settings.
 
 1. Change your `root` MySQL user password:
@@ -27,7 +29,7 @@ $docker run -p 3306:3306/tcp --name=mysql80 -d mysql/mysql-server
 ```
 you should now be able to connect via `'root'@localhost:3306`...
 
-# python requirements:
+## DDL & python requirements:
 You'll need the `mysql-connector-python` package to run the `python_ddl.py` script:
 ```
 conda install -c anaconda mysql-connector-python
@@ -57,12 +59,18 @@ PRIMARY KEY (declaration date, std_doc_id, std_proj, publication_nr)
 ```
 That there are duplicates in this extract is kind of confusing: surely the database that they came from would maintain its own integrity and make this impermissible?...
 
-A final note: this data includes Asian characters (Japanese?) and MySQL doesn't have true UTF-8 character support, so the database needs to be initialized with the `utf8mb4` character set:
+Note: this data includes Asian characters (Japanese?) and MySQL doesn't have true UTF-8 character support, so the database needs to be initialized with the `utf8mb4` character set:
 ```
 CREATE DATABASE IF NOT EXISTS IPlytics CHARACTER SET utf8mb4;
 ```
 
-# analysis
+Finally: the python script doesn't cover 100% best practice. In particular, it's not commented, nor does it contain as many `try...except...` blocks as it probably should. This was a half-deliberate decision. Time permitting, I'm not sure the operational context of such a script would demand the level of defensive-programming standard practices would dictate. Speaking plainly: I anticipate that scripts like this are meant to be one-off's, and the true guard-rails need to be baked into the daily/`chron`'d scripts that will be doing the brunt of the ETL work. As with all things, we need to measure the time-cost of making something like this "bullet-proof" versus the reality that it will only be used once and then thrown away. Good automation should always be considered as such:
+```
+(future developer time saved)/(time-cost to produce)
+``` 
+In an ideal world, we'd only work on projects where the ratios were estimated to be significantly greater than 1. In reality, we're often stuck polishing code beyond a reasonable marginal-utility rate and the ratio is abysmally low...
+
+# Analysis
 
 ## most cited patents:
 ```sql
