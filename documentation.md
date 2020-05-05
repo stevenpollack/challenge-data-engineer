@@ -27,6 +27,12 @@ $docker run -p 3306:3306/tcp --name=mysql80 -d mysql/mysql-server
 ```
 you should now be able to connect via `'root'@localhost:3306`...
 
+# python requirements:
+You'll need the `mysql-connector-python` package to run the `python_ddl.py` script:
+```
+conda install -c anaconda mysql-connector-python
+```
+or `pip` should fetch it without too many issues.
 
 `Standard` entities are authored by individuals and can be identified by their `standard_doc_id`
 
